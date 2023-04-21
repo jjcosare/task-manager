@@ -1,0 +1,121 @@
+import org.hidetake.gradle.swagger.generator.GenerateSwaggerUI
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.0.5'
+	id 'io.spring.dependency-management' version '1.1.0'
+	id 'org.asciidoctor.convert' version '1.5.8'
+	id 'jacoco'
+	id 'org.sonarqube' version '4.0.0.2929'
+	id 'com.avast.gradle.docker-compose' version '0.14.3'
+	id 'com.epages.restdocs-api-spec' version '0.17.1'
+	id 'org.hidetake.swagger.generator' version '2.18.2'
+}
+
+def applicationProperties = new Properties()
+file("${project.projectDir}/src/main/resources/application.properties").withInputStream { applicationProperties.load(it) }
+
+group = 'com.jjcosare'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '17'
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('snippetsDir', file('build/generated-snippets'))
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.mapstruct:mapstruct:1.5.4.Final'
+	implementation('org.jeasy:easy-random-core:5.0.0')
+	implementation('com.google.code.bean-matchers:bean-matchers:0.13')
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	compileOnly 'org.mapstruct:mapstruct-processor:1.5.4.Final'
+	compileOnly 'org.projectlombok:lombok'
+	compileOnly 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+	runtimeOnly 'org.postgresql:postgresql'
+	annotationProcessor 'org.projectlombok:lombok'
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.4.Final'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+	testImplementation 'org.awaitility:awaitility:4.2.0'
+	testImplementation 'com.h2database:h2'
+	testImplementation 'com.epages:restdocs-api-spec-mockmvc:0.17.1'
+	swaggerUI 'org.webjars:swagger-ui:4.15.5'
+}
+
+tasks.named('test') {
+	outputs.dir snippetsDir
+	useJUnitPlatform()
+}
+
+tasks.named('asciidoctor') {
+	inputs.dir snippetsDir
+	dependsOn test
+}
+
+sonar {
+	properties {
+		property 'sonar.host.url', 'http://localhost:9000'
+		property 'sonar.login', 'admin'
+		property 'sonar.password', 'admin'
+	}
+}
+
+jacocoTestReport {
+	reports {
+		xml.required = true
+	}
+}
+test.finalizedBy jacocoTestReport
+tasks.named('sonar').configure {
+	dependsOn test
+}
+
+openapi3 {
+	server = 'http://localhost:'+ applicationProperties.getProperty('server.port')
+	title = 'Task Manager'
+	description = 'Public API for Task Manager'
+	version = '0.0.1'
+	format = 'yaml'
+}
+
+postman {
+	baseUrl = 'http://localhost:'+ applicationProperties.getProperty('server.port')
+	title = 'Public API for Task Manager'
+	description = 'Public API for Task Manager'
+	version = '0.0.1'
+}
+
+swaggerSources {
+	sample {
+	   setInputFile(file("${project.buildDir}/api-spec/openapi3.yaml"))
+	}
+}
+
+tasks.withType(GenerateSwaggerUI).configureEach {
+	dependsOn 'openapi3'
+	dependsOn 'postman'
+}
+tasks.register('copySwaggerUI', Copy) {
+	dependsOn 'generateSwaggerUISample'
+
+	def generateSwaggerUISampleTask = tasks.named('generateSwaggerUISample', GenerateSwaggerUI).get()
+
+	from("${generateSwaggerUISampleTask.outputDir}")
+	into("${project.buildDir}/resources/main/static/docs")
+}
+tasks.withType(BootJar).configureEach {
+	dependsOn 'copySwaggerUI'
+}
