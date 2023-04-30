@@ -51,18 +51,16 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 class TaskControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
+    MockMvc mockMvc;
 
     @Autowired
-    public ObjectMapper objectMapper;
+    ObjectMapper objectMapper;
 
-    public EasyRandom easyRandom = new EasyRandom(new EasyRandomParameters()
-            .randomize(String.class, () -> "1")
-            .collectionSizeRange(2, 3)
-    );
+    EasyRandom easyRandom = new EasyRandom(new EasyRandomParameters());
+
 
     @BeforeAll
-    public void beforeAll() {
+    void beforeAll() {
         BeanMatchers.registerValueGenerator(() -> LocalDate.now().minusDays(easyRandom.nextInt()), LocalDate.class);
         BeanMatchers.registerValueGenerator(() -> LocalTime.now().minusMinutes(easyRandom.nextLong()), LocalTime.class);
         BeanMatchers.registerValueGenerator(() -> LocalDateTime.now().minusSeconds(easyRandom.nextInt()), LocalDateTime.class);
@@ -72,11 +70,11 @@ class TaskControllerTest {
 
     @MockBean
     @Qualifier(value = "taskServiceImpl")
-    private TaskService taskService;
+    TaskService taskService;
 
     @BeforeEach
-    public void setUp(WebApplicationContext webApplicationContext,
-                      RestDocumentationContextProvider restDocumentation) {
+    void setUp(WebApplicationContext webApplicationContext,
+               RestDocumentationContextProvider restDocumentation) {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
                 .apply(documentationConfiguration(restDocumentation))
                 .build();
