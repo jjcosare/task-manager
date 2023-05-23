@@ -1,20 +1,19 @@
-version: '3'
+version: '3.8'
 
 services:
   app:
     image: 'jjcosare-spring-boot-postgres:latest'
     build:
       context: .
-    container_name: app
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/sample
-      - SPRING_DATASOURCE_USERNAME=sample
-      - SPRING_DATASOURCE_PASSWORD=sample
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/jjcosare
+      - SPRING_DATASOURCE_USERNAME=jjcosare
+      - SPRING_DATASOURCE_PASSWORD=jjcosare
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/api/healthcheck" ]
@@ -23,16 +22,16 @@ services:
       retries: 3
 
   db:
-    image: postgres:14
+    image: postgres:15
     volumes:
-      - sample_db:/var/lib/postgresql/data
+      - ./docker_postgres_init.sh:/docker-entrypoint-initdb.d/docker_postgres_init.sh
     environment:
-      - POSTGRES_PASSWORD=sample
-      - POSTGRES_USER=sample
-      - POSTGRES_DB=sample
-      - PGDATA=/var/lib/postgresql/data/pgdata
+      - DATABASE_HOST=127.0.0.1
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_MULTIPLE_DATABASES=jjcosare,sonarqube,supertokens
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready" ]
       interval: 5s
@@ -56,16 +55,33 @@ services:
       retries: 3
 
   sonarqube:
-    image: sonarqube:lts
+    image: sonarqube:10-community
     ports:
       - "9000:9000"
     environment:
-      - SONAR_FORCEAUTHENTICATION=false
+      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonarqube
+      - SONAR_JDBC_USERNAME=sonarqube
+      - SONAR_JDBC_PASSWORD=sonarqube
+    depends_on:
+      - db
     healthcheck:
       test: [ "CMD", "wget", "-O", "-", "http://localhost:9000/api/system/status" ]
       interval: 5s
       timeout: 10s
       retries: 3
 
-volumes:
-  sample_db: { }
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:4.6
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3567:3567"
+    environment:
+      POSTGRESQL_CONNECTION_URI: "postgresql://supertokens:supertokens@db:5432/supertokens"
+    healthcheck:
+      test: >
+        bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e "GET /hello HTTP/1.1\r\nhost: 127.0.0.1:3567\r\nConnection: close\r\n\r\n" >&3 && cat <&3 | grep "Hello"'
+      interval: 10s
+      timeout: 5s
+      retries: 5
