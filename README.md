@@ -20,7 +20,8 @@ swagger api docs: http://localhost:8080/docs/index.html
 
 To access test coverage on sonarqube:
 
-```gradle clean pitest sonar
+```gradle 
+./gradlew clean pitest sonar
 ```
 
 sonarqube: http://localhost:9000/dashboard?id=com.jjcosare%3Atask
